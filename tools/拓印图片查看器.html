@@ -552,9 +552,19 @@
           button.setPointerCapture?.(event.pointerId);
           nudgePresses.set(button, { timer: setTimeout(() => startNudgeRepeat(direction, button), nudgeHoldDelay), interval: null, held: false, ended: false });
         });
-        button.addEventListener('pointerup', () => stopNudgeRepeat(button));
+        button.addEventListener('pointerup', (event) => {
+          const press = nudgePresses.get(button);
+          const wasHeld = Boolean(press?.held);
+          stopNudgeRepeat(button);
+          if (event.pointerType === 'touch' && !wasHeld) {
+            nudge(direction);
+            button.dataset.suppressClick = 'true';
+          }
+        });
         button.addEventListener('pointercancel', () => stopNudgeRepeat(button));
         button.addEventListener('pointerleave', () => stopNudgeRepeat(button));
+        button.addEventListener('touchstart', (event) => event.preventDefault(), { passive: false });
+        button.addEventListener('contextmenu', (event) => event.preventDefault(), { capture: true });
         button.addEventListener('click', () => {
           if (button.dataset.suppressClick === 'true') {
             delete button.dataset.suppressClick;
