@@ -182,12 +182,12 @@
       right: max(12px, env(safe-area-inset-right));
       bottom: max(82px, calc(env(safe-area-inset-bottom) + 82px));
       display: grid;
-      grid-template-columns: repeat(3, 52px);
-      grid-template-rows: repeat(3, 52px);
+      grid-template-columns: repeat(3, 46px);
+      grid-template-rows: repeat(3, 46px);
       gap: 4px;
-      padding: 7px;
+      padding: 6px;
       border: 1px solid rgb(255 255 255 / .18);
-      border-radius: 20px;
+      border-radius: 18px;
       background: linear-gradient(145deg, rgb(32 43 44 / .94), rgb(16 22 24 / .9));
       box-shadow: 0 16px 34px rgb(0 0 0 / .34), inset 0 1px 0 rgb(255 255 255 / .08);
       backdrop-filter: blur(16px);
@@ -195,14 +195,14 @@
     }
 
     .move-button {
-      min-width: 48px;
-      min-height: 42px;
+      min-width: 44px;
+      min-height: 40px;
       padding: 0;
       border-color: transparent;
-      border-radius: 14px;
+      border-radius: 12px;
       background: rgb(255 255 255 / .06);
       color: var(--text);
-      font-size: 22px;
+      font-size: 19px;
       box-shadow: inset 0 1px 0 rgb(255 255 255 / .05);
     }
 
@@ -212,20 +212,6 @@
     #moveDown { grid-column: 2; grid-row: 3; }
 
     .move-button:active:not(:disabled) { background: var(--accent); color: var(--accent-ink); }
-
-    .move-center {
-      grid-column: 2;
-      grid-row: 2;
-      display: grid;
-      place-items: center;
-      border: 1px solid rgb(98 217 172 / .2);
-      border-radius: 14px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-size: 11px;
-      font-weight: 750;
-      letter-spacing: .02em;
-    }
 
     .zoom-value {
       min-width: 46px;
@@ -302,8 +288,8 @@
       .tool-tray { gap: 4px; }
       .tool-tray button { padding-inline: 7px; }
       #resetButton { display: none; }
-      .move-pad { grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); }
-      .move-button { min-width: 44px; min-height: 42px; }
+      .move-pad { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px); padding: 5px; }
+      .move-button { min-width: 40px; min-height: 38px; border-radius: 11px; font-size: 18px; }
     }
   </style>
 </head>
@@ -329,7 +315,6 @@
         <button class="move-button" id="moveLeft" type="button" aria-label="向左移动" disabled>←</button>
         <button class="move-button" id="moveRight" type="button" aria-label="向右移动" disabled>→</button>
         <button class="move-button" id="moveDown" type="button" aria-label="向下移动" disabled>↓</button>
-        <span class="move-center" aria-hidden="true">10 px</span>
       </div>
       <button class="lock-button" id="lockButton" type="button" aria-pressed="false" disabled>锁定</button>
       <button id="collapseButton" type="button" aria-label="收起工具栏">收起</button>
@@ -429,6 +414,9 @@
       let objectUrl = '';
       let hasImage = false;
       let fitScale = 1;
+      const nudgeHoldDelay = 320;
+      const nudgeRepeatDelay = 90;
+      const nudgePresses = new Map();
       let dragOrigin = null;
       let pinchOrigin = null;
 
@@ -505,6 +493,24 @@
         renderImage();
       };
 
+      function startNudgeRepeat(direction, button) {
+        const press = nudgePresses.get(button);
+        if (!press || press.ended) return;
+        press.held = true;
+        nudge(direction);
+        press.interval = setInterval(() => nudge(direction), nudgeRepeatDelay);
+      }
+
+      function stopNudgeRepeat(button) {
+        const press = nudgePresses.get(button);
+        if (!press) return;
+        press.ended = true;
+        clearTimeout(press.timer);
+        clearInterval(press.interval);
+        if (press.held) button.dataset.suppressClick = 'true';
+        nudgePresses.delete(button);
+      }
+
       function clearPointerState() {
         pointers.clear();
         dragOrigin = null;
@@ -528,7 +534,21 @@
       zoomOut.addEventListener('click', () => zoomBy(1 / 1.2));
       resetButton.addEventListener('click', resetToFit);
       Object.entries(moveButtons).forEach(([direction, button]) => {
-        button.addEventListener('click', () => nudge(direction));
+        button.addEventListener('pointerdown', (event) => {
+          if (button.disabled) return;
+          button.setPointerCapture?.(event.pointerId);
+          nudgePresses.set(button, { timer: setTimeout(() => startNudgeRepeat(direction, button), nudgeHoldDelay), interval: null, held: false, ended: false });
+        });
+        button.addEventListener('pointerup', () => stopNudgeRepeat(button));
+        button.addEventListener('pointercancel', () => stopNudgeRepeat(button));
+        button.addEventListener('pointerleave', () => stopNudgeRepeat(button));
+        button.addEventListener('click', () => {
+          if (button.dataset.suppressClick === 'true') {
+            delete button.dataset.suppressClick;
+            return;
+          }
+          nudge(direction);
+        });
       });
       lockButton.addEventListener('click', toggleLock);
       miniLockButton.addEventListener('click', toggleLock);
