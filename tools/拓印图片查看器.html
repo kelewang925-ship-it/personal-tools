@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d0e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>拓印图片</title>
+  <style>
+    :root {
+      --surface: rgb(24 28 29 / .94);
+      --line: rgb(255 255 255 / .16);
+      --text: #f3f6f5;
+      --muted: #aeb8b5;
+      --accent: #62d9ac;
+      --accent-ink: #06271a;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      min-height: 100dvh;
+      margin: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      background: #0b0d0e;
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei UI", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button, input { font: inherit; }
+
+    button {
+      min-width: 48px;
+      min-height: 48px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #262c2e;
+      color: var(--text);
+      font-weight: 650;
+      line-height: 1;
+      white-space: nowrap;
+      touch-action: manipulation;
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(.96);
+      background: #31393b;
+    }
+
+    button:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    button:disabled {
+      opacity: .34;
+      pointer-events: none;
+    }
+
+    .app, .stage {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      min-height: 100dvh;
+    }
+
+    .stage {
+      overflow: hidden;
+      background: #0b0d0e;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body.is-locked .stage {
+      pointer-events: none;
+      cursor: default;
+    }
+
+    .stage.dragging { cursor: grabbing; }
+
+    .image-wrap {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform-origin: center;
+      will-change: transform;
+    }
+
+    .viewer-image {
+      display: block;
+      max-width: none;
+      max-height: none;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+
+    .empty-state {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .pick-primary {
+      min-width: 156px;
+      min-height: 56px;
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-size: 16px;
+    }
+
+    .tool-tray {
+      position: fixed;
+      z-index: 10;
+      left: 50%;
+      bottom: max(14px, env(safe-area-inset-bottom));
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      max-width: calc(100vw - 20px);
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 7px);
+      background: var(--surface);
+      box-shadow: 0 12px 36px rgb(0 0 0 / .32);
+      transform: translateX(-50%);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .tool-tray button {
+      padding-inline: 12px;
+      font-size: 13px;
+    }
+
+    .tool-tray .square {
+      width: 48px;
+      padding: 0;
+      font-size: 23px;
+    }
+
+    .move-pad {
+      position: fixed;
+      z-index: 11;
+      right: max(12px, env(safe-area-inset-right));
+      bottom: max(82px, calc(env(safe-area-inset-bottom) + 82px));
+      display: grid;
+      grid-template-columns: repeat(2, 48px);
+      grid-template-rows: repeat(2, 42px);
+      gap: 4px;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 12px 32px rgb(0 0 0 / .3);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .move-button {
+      min-width: 48px;
+      min-height: 42px;
+      padding: 0;
+      border-radius: 10px;
+      font-size: 20px;
+    }
+
+    .move-button:active:not(:disabled) { background: #394345; }
+
+    .zoom-value {
+      min-width: 46px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .lock-button[aria-pressed="true"],
+    .mini-lock[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+
+    .mini-controls {
+      position: fixed;
+      z-index: 12;
+      right: max(10px, env(safe-area-inset-right));
+      bottom: max(10px, env(safe-area-inset-bottom));
+      display: none;
+      gap: 7px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 6px);
+      background: var(--surface);
+      box-shadow: 0 10px 30px rgb(0 0 0 / .28);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .mini-controls button {
+      width: 48px;
+      padding: 0;
+      font-size: 12px;
+    }
+
+    body.controls-collapsed .tool-tray { display: none; }
+    body.controls-collapsed .mini-controls { display: flex; }
+    body.controls-collapsed .move-pad { display: none; }
+    body.is-locked #expandButton { display: none; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 520px) {
+      .tool-tray { gap: 5px; padding: 6px; }
+      .tool-tray button {
+        min-width: 44px;
+        min-height: 46px;
+        padding-inline: 9px;
+        font-size: 12px;
+      }
+      .tool-tray .square { width: 44px; padding: 0; }
+      .zoom-value { display: none; }
+    }
+
+    @media (max-width: 390px) {
+      .tool-tray { gap: 4px; }
+      .tool-tray button { padding-inline: 7px; }
+      #resetButton { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="stage" id="imageStage" aria-label="拓印图片区域">
+      <div class="image-wrap hidden" id="imageWrap">
+        <img class="viewer-image" id="viewerImage" alt="选中的本地图片" draggable="false">
+      </div>
+      <div class="empty-state" id="emptyState">
+        <button class="pick-primary" id="emptyPickButton" type="button">选择图片</button>
+      </div>
+    </section>
+
+    <nav class="tool-tray" id="toolTray" aria-label="图片操作">
+      <button id="pickButton" type="button">换图</button>
+      <button class="square" id="zoomOut" type="button" aria-label="缩小" disabled>−</button>
+      <output class="zoom-value" id="zoomValue" aria-live="polite">100%</output>
+      <button class="square" id="zoomIn" type="button" aria-label="放大" disabled>+</button>
+      <button id="resetButton" type="button" disabled>适配</button>
+      <div class="move-pad" aria-label="移动图片">
+        <button class="move-button" id="moveUp" type="button" aria-label="向上移动" disabled>↑</button>
+        <button class="move-button" id="moveDown" type="button" aria-label="向下移动" disabled>↓</button>
+        <button class="move-button" id="moveLeft" type="button" aria-label="向左移动" disabled>←</button>
+        <button class="move-button" id="moveRight" type="button" aria-label="向右移动" disabled>→</button>
+      </div>
+      <button class="lock-button" id="lockButton" type="button" aria-pressed="false" disabled>锁定</button>
+      <button id="collapseButton" type="button" aria-label="收起工具栏">收起</button>
+    </nav>
+
+    <div class="mini-controls" id="miniControls">
+      <button id="expandButton" type="button" aria-label="展开工具栏">展开</button>
+      <button class="mini-lock" id="miniLockButton" type="button" aria-pressed="false" disabled>锁</button>
+    </div>
+
+    <input id="fileInput" type="file" accept="image/*" hidden>
+    <p class="sr-only" id="statusMessage" aria-live="polite">请选择图片</p>
+  </main>
+
+  <script id="viewer-core">
+    (function (global) {
+      'use strict';
+
+      global.createViewerState = function createViewerState() {
+        const state = { scale: 1, x: 0, y: 0, locked: false, controlsCollapsed: false };
+        const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+        return {
+          setScale(nextScale) {
+            if (state.locked) return state.scale;
+            state.scale = clamp(Number(nextScale) || 1, 0.1, 5);
+            return state.scale;
+          },
+          setPosition(x, y) {
+            if (state.locked) return { x: state.x, y: state.y };
+            state.x = Number.isFinite(x) ? x : state.x;
+            state.y = Number.isFinite(y) ? y : state.y;
+            return { x: state.x, y: state.y };
+          },
+          nudge(direction) {
+            if (state.locked) return { x: state.x, y: state.y };
+            const delta = { up: [0, -10], down: [0, 10], left: [-10, 0], right: [10, 0] }[direction];
+            if (!delta) return { x: state.x, y: state.y };
+            state.x += delta[0];
+            state.y += delta[1];
+            return { x: state.x, y: state.y };
+          },
+          reset() {
+            if (state.locked) return false;
+            state.scale = 1;
+            state.x = 0;
+            state.y = 0;
+            return true;
+          },
+          setLocked(nextLocked) {
+            state.locked = Boolean(nextLocked);
+            return state.locked;
+          },
+          setControlsCollapsed(nextCollapsed) {
+            if (state.locked) return state.controlsCollapsed;
+            state.controlsCollapsed = Boolean(nextCollapsed);
+            return state.controlsCollapsed;
+          },
+          snapshot() {
+            return { scale: state.scale, x: state.x, y: state.y, locked: state.locked, controlsCollapsed: state.controlsCollapsed };
+          }
+        };
+      };
+    })(window);
+  </script>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const viewer = window.createViewerState();
+      const byId = (id) => document.getElementById(id);
+      const fileInput = byId('fileInput');
+      const pickButton = byId('pickButton');
+      const emptyPickButton = byId('emptyPickButton');
+      const zoomOut = byId('zoomOut');
+      const zoomIn = byId('zoomIn');
+      const zoomValue = byId('zoomValue');
+      const resetButton = byId('resetButton');
+      const moveButtons = {
+        up: byId('moveUp'),
+        down: byId('moveDown'),
+        left: byId('moveLeft'),
+        right: byId('moveRight')
+      };
+      const lockButton = byId('lockButton');
+      const miniLockButton = byId('miniLockButton');
+      const collapseButton = byId('collapseButton');
+      const expandButton = byId('expandButton');
+      const imageStage = byId('imageStage');
+      const imageWrap = byId('imageWrap');
+      const viewerImage = byId('viewerImage');
+      const emptyState = byId('emptyState');
+      const statusMessage = byId('statusMessage');
+      const pointers = new Map();
+
+      let objectUrl = '';
+      let hasImage = false;
+      let fitScale = 1;
+      let dragOrigin = null;
+      let pinchOrigin = null;
+
+      const isLocked = () => viewer.snapshot().locked;
+      const setStatus = (message) => { statusMessage.textContent = message; };
+      const preventNativeZoom = (event) => event.preventDefault();
+      const preventLongPressActions = (event) => event.preventDefault();
+
+      document.addEventListener('gesturestart', preventNativeZoom, { passive: false });
+      document.addEventListener('gesturechange', preventNativeZoom, { passive: false });
+      document.addEventListener('gestureend', preventNativeZoom, { passive: false });
+      document.addEventListener('contextmenu', preventLongPressActions);
+      document.addEventListener('selectstart', preventLongPressActions);
+      document.addEventListener('dragstart', preventLongPressActions);
+      document.addEventListener('touchmove', (event) => {
+        if (event.touches.length > 1) event.preventDefault();
+      }, { passive: false });
+
+      function renderImage() {
+        const state = viewer.snapshot();
+        imageWrap.style.transform = `translate(-50%, -50%) translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+        zoomValue.value = `${Math.round(state.scale * 100)}%`;
+        zoomValue.textContent = zoomValue.value;
+      }
+
+      function renderControls() {
+        const state = viewer.snapshot();
+        document.body.classList.toggle('is-locked', state.locked);
+        document.body.classList.toggle('controls-collapsed', state.controlsCollapsed);
+        lockButton.textContent = state.locked ? '解锁' : '锁定';
+        miniLockButton.textContent = state.locked ? '解锁' : '锁';
+        lockButton.setAttribute('aria-pressed', String(state.locked));
+        miniLockButton.setAttribute('aria-pressed', String(state.locked));
+        pickButton.disabled = state.locked;
+        emptyPickButton.disabled = state.locked;
+        zoomOut.disabled = state.locked || !hasImage;
+        zoomIn.disabled = state.locked || !hasImage;
+        resetButton.disabled = state.locked || !hasImage;
+        Object.values(moveButtons).forEach((button) => { button.disabled = state.locked || !hasImage; });
+        collapseButton.disabled = state.locked;
+        expandButton.disabled = state.locked;
+        lockButton.disabled = !hasImage;
+        miniLockButton.disabled = !hasImage;
+      }
+
+      function calculateFitScale() {
+        return Math.min(1, window.innerWidth / Math.max(1, viewerImage.naturalWidth), window.innerHeight / Math.max(1, viewerImage.naturalHeight));
+      }
+
+      function resetToFit() {
+        if (isLocked() || !hasImage) return;
+        viewer.reset();
+        viewer.setScale(fitScale);
+        renderImage();
+        setStatus('图片已适配屏幕');
+      }
+
+      function zoomTo(nextScale, clientX, clientY) {
+        if (isLocked() || !hasImage) return;
+        const before = viewer.snapshot();
+        const anchorX = Number.isFinite(clientX) ? clientX - window.innerWidth / 2 : 0;
+        const anchorY = Number.isFinite(clientY) ? clientY - window.innerHeight / 2 : 0;
+        const scale = viewer.setScale(nextScale);
+        const ratio = scale / before.scale;
+        viewer.setPosition(anchorX - (anchorX - before.x) * ratio, anchorY - (anchorY - before.y) * ratio);
+        renderImage();
+      }
+
+      const zoomBy = (factor, x, y) => zoomTo(viewer.snapshot().scale * factor, x, y);
+      const openPicker = () => { if (!isLocked()) fileInput.click(); };
+      const nudge = (direction) => {
+        if (isLocked() || !hasImage) return;
+        viewer.nudge(direction);
+        renderImage();
+      };
+
+      function clearPointerState() {
+        pointers.clear();
+        dragOrigin = null;
+        pinchOrigin = null;
+        imageStage.classList.remove('dragging');
+      }
+
+      function toggleLock() {
+        if (!hasImage) return;
+        const nextLocked = !isLocked();
+        if (nextLocked) viewer.setControlsCollapsed(true);
+        viewer.setLocked(nextLocked);
+        clearPointerState();
+        renderControls();
+        setStatus(nextLocked ? '已锁定' : '已解锁');
+      }
+
+      pickButton.addEventListener('click', openPicker);
+      emptyPickButton.addEventListener('click', openPicker);
+      zoomIn.addEventListener('click', () => zoomBy(1.2));
+      zoomOut.addEventListener('click', () => zoomBy(1 / 1.2));
+      resetButton.addEventListener('click', resetToFit);
+      Object.entries(moveButtons).forEach(([direction, button]) => {
+        button.addEventListener('click', () => nudge(direction));
+      });
+      lockButton.addEventListener('click', toggleLock);
+      miniLockButton.addEventListener('click', toggleLock);
+      collapseButton.addEventListener('click', () => { viewer.setControlsCollapsed(true); renderControls(); });
+      expandButton.addEventListener('click', () => { viewer.setControlsCollapsed(false); renderControls(); });
+
+      fileInput.addEventListener('change', () => {
+        if (isLocked()) return;
+        const file = fileInput.files && fileInput.files[0];
+        fileInput.value = '';
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { setStatus('请选择图片文件'); return; }
+
+        const nextUrl = URL.createObjectURL(file);
+        viewerImage.onload = () => {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          objectUrl = nextUrl;
+          hasImage = true;
+          fitScale = Math.max(0.1, calculateFitScale());
+          imageWrap.classList.remove('hidden');
+          emptyState.classList.add('hidden');
+          resetToFit();
+          renderControls();
+          setStatus('图片已打开');
+        };
+        viewerImage.onerror = () => { URL.revokeObjectURL(nextUrl); setStatus('图片读取失败'); };
+        viewerImage.src = nextUrl;
+      });
+
+      imageStage.addEventListener('wheel', (event) => {
+        if (isLocked() || !hasImage) return;
+        event.preventDefault();
+        zoomBy(event.deltaY < 0 ? 1.12 : 1 / 1.12, event.clientX, event.clientY);
+      }, { passive: false });
+
+      imageStage.addEventListener('dblclick', (event) => {
+        if (isLocked() || !hasImage) return;
+        const current = viewer.snapshot().scale;
+        zoomTo(current > fitScale * 1.6 ? fitScale : Math.max(1, fitScale * 2), event.clientX, event.clientY);
+      });
+
+      imageStage.addEventListener('pointerdown', (event) => {
+        if (isLocked() || !hasImage) return;
+        event.preventDefault();
+        imageStage.setPointerCapture(event.pointerId);
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pointers.size === 1) {
+          const state = viewer.snapshot();
+          dragOrigin = { pointerX: event.clientX, pointerY: event.clientY, x: state.x, y: state.y };
+          imageStage.classList.add('dragging');
+        } else if (pointers.size === 2) {
+          const points = [...pointers.values()];
+          pinchOrigin = { distance: Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y), scale: viewer.snapshot().scale };
+          dragOrigin = null;
+        }
+      });
+
+      imageStage.addEventListener('pointermove', (event) => {
+        if (isLocked() || !pointers.has(event.pointerId)) return;
+        event.preventDefault();
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pointers.size === 2 && pinchOrigin) {
+          const points = [...pointers.values()];
+          const distance = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+          zoomTo(pinchOrigin.scale * distance / Math.max(1, pinchOrigin.distance), (points[0].x + points[1].x) / 2, (points[0].y + points[1].y) / 2);
+        } else if (pointers.size === 1 && dragOrigin) {
+          viewer.setPosition(dragOrigin.x + event.clientX - dragOrigin.pointerX, dragOrigin.y + event.clientY - dragOrigin.pointerY);
+          renderImage();
+        }
+      });
+
+      function endPointer(event) {
+        pointers.delete(event.pointerId);
+        if (pointers.size === 1) {
+          const point = [...pointers.values()][0];
+          const state = viewer.snapshot();
+          dragOrigin = { pointerX: point.x, pointerY: point.y, x: state.x, y: state.y };
+          pinchOrigin = null;
+        } else if (pointers.size === 0) {
+          clearPointerState();
+        }
+      }
+
+      imageStage.addEventListener('pointerup', endPointer);
+      imageStage.addEventListener('pointercancel', endPointer);
+      document.addEventListener('keydown', (event) => {
+        if (isLocked() || !hasImage || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (event.key === '+' || event.key === '=') zoomBy(1.2);
+        if (event.key === '-' || event.key === '_') zoomBy(1 / 1.2);
+        if (event.key === '0') resetToFit();
+        const direction = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[event.key];
+        if (direction) {
+          event.preventDefault();
+          nudge(direction);
+        }
+      });
+      window.addEventListener('resize', () => {
+        if (!hasImage || isLocked()) return;
+        fitScale = Math.max(0.1, calculateFitScale());
+      });
+      window.addEventListener('beforeunload', () => { if (objectUrl) URL.revokeObjectURL(objectUrl); });
+
+      renderImage();
+      renderControls();
+    })();
+  </script>
+</body>
+</html>
