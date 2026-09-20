@@ -1,14 +1,115 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>购车方案库</title><style>
-body{margin:auto;max-width:720px;padding:16px;background:#102025;color:#edf5f2;font:16px system-ui}section,.car,.finance{background:#183036;border:1px solid #365057;border-radius:14px;padding:16px;margin:12px 0}.car{width:100%;color:inherit;text-align:left}.sum{display:block;color:#79e0bb;font-size:23px;font-weight:800;margin:8px 0}.row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #365057}.row:last-child{border:0}button,input{min-height:44px;font:inherit;border-radius:9px;padding:8px}button{border:0;background:#79e0bb;color:#10251e;font-weight:700}.ghost{background:transparent;color:#edf5f2;border:1px solid #365057}.actions{display:flex;gap:8px;flex-wrap:wrap}.edit{display:grid;gap:10px}.edit label{display:grid;gap:5px}.edit input{background:#102025;color:white;border:1px solid #365057}@media(max-width:520px){.actions button{flex:1}}
-</style><main id="app"></main><script type="module">
-import{createCar,loadLibrary,renameCar,removeCar}from'./car-library.js';import{calculatePlan}from'./car-loan-calculations.js';
-const root=document.querySelector('#app'),key='personal-tools.car-library.v1',fmt=n=>new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY'}).format(n||0);let lib=loadLibrary(localStorage.getItem(key)),page='list',editing=false;
-const active=()=>lib.cars.find(c=>c.id===lib.activeId),total=c=>c.expenseItems.reduce((n,x)=>n+Number(x.amount||0),0),save=()=>localStorage.setItem(key,JSON.stringify(lib));
-function result(p){return calculatePlan({carPrice:+p.downPayment+ +p.loanAmount,downPayment:+p.downPayment,purchaseTax:0,insurance:0,registrationFee:0,otherFee:0},{months:+p.months,annualRate:+p.rate,fee:0,repaymentMethod:'annuity'})}
-function list(){return `<h1>我的购车方案</h1><button data-new>新增购车方案</button>${lib.cars.map(c=>`<button class="car" data-open="${c.id}"><b>${c.name}</b><span class="sum">${fmt(total(c))}</span>落地价 · ${c.financePlans.length} 个金融方案</button>`).join('')}`}
-function detail(){let c=active(),fees=editing?`<div class="edit">${c.expenseItems.map(x=>`<label>${x.label}<input data-fee="${x.id}" type="number" value="${x.amount}"></label>`).join('')}<button data-addfee>新增自定义费用</button><button data-savefee>保存基本费用</button></div>`:c.expenseItems.map(x=>`<div class="row"><span>${x.label}</span><b>${fmt(x.amount)}</b></div>`).join('');return `<div class="actions"><button class="ghost" data-back>返回列表</button><button class="ghost" data-name>修改名称</button><button class="ghost" data-delete>删除方案</button></div><h1>${c.name}</h1><section><h2>基本费用</h2><button data-editfee>${editing?'取消编辑':'编辑基本费用'}</button>${fees}<p class="sum">落地价 ${fmt(total(c))}</p></section><section><h2>金融方案</h2><button data-addplan>新增金融方案</button>${c.financePlans.map(p=>{let r=result(p);return `<article class="finance"><div class="edit"><label>贷款方<input data-plan="${p.id}" data-field="lender" value="${p.lender}"></label><label>首付<input data-plan="${p.id}" data-field="downPayment" type="number" value="${p.downPayment}"></label><label>贷款金额<input data-plan="${p.id}" data-field="loanAmount" type="number" value="${p.loanAmount}"></label><label>年利率（%）<input data-plan="${p.id}" data-field="rate" type="number" value="${p.rate}"></label><label>分期期数<input data-plan="${p.id}" data-field="months" type="number" value="${p.months}"></label></div><div class="row"><span>每期还款</span><b>${fmt(r.monthlyPayment)}</b></div><div class="row"><span>总还款 / 总利息</span><b>${fmt(r.totalPayment)} / ${fmt(r.totalInterest)}</b></div></article>`}).join('')||'<p>还没有金融方案</p>'}</section>`}
-function render(){root.innerHTML=page==='list'?list():detail()}
-function change(f){f();active().updatedAt=Date.now();save();render()}
-root.onclick=e=>{let d=e.target.dataset,c=active();if(d.new){let n=createCar();lib.cars.push(n);lib.activeId=n.id;page='detail';save()}else if(d.open){lib.activeId=d.open;page='detail'}else if(d.back)page='list';else if(d.editfee)editing=!editing;else if(d.savefee)editing=false;else if(d.addfee)change(()=>c.expenseItems.push({id:crypto.randomUUID(),label:'自定义费用',amount:0}));else if(d.name){let n=prompt('购车方案名称',c.name);if(n!==null)change(()=>Object.assign(c,renameCar(c,n)))}else if(d.delete&&confirm('确定删除此购车方案？')){lib=removeCar(lib,c.id);page='list';save()}else if(d.addplan)change(()=>c.financePlans.push({id:crypto.randomUUID(),lender:'银行方案',downPayment:0,loanAmount:100000,rate:3.6,months:60}));render()};
-root.oninput=e=>{let t=e.target,c=active();if(t.dataset.fee){c.expenseItems.find(x=>x.id===t.dataset.fee).amount=+t.value;save();render()}if(t.dataset.plan){let p=c.financePlans.find(x=>x.id===t.dataset.plan),f=t.dataset.field;p[f]=['downPayment','loanAmount','rate','months'].includes(f)?+t.value:t.value;save();render()}};render();
-</script></html>
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>购车方案库</title>
+<style>
+    body {
+        margin: auto;
+        max-width: 720px;
+        padding: 16px;
+        background: #102025;
+        color: #edf5f2;
+        font: 16px system-ui
+    }
+
+    section,
+    .car,
+    .finance {
+        background: #183036;
+        border: 1px solid #365057;
+        border-radius: 14px;
+        padding: 16px;
+        margin: 12px 0
+    }
+
+    .car {
+        width: 100%;
+        color: inherit;
+        text-align: left
+    }
+
+    .sum {
+        display: block;
+        color: #79e0bb;
+        font-size: 23px;
+        font-weight: 800;
+        margin: 8px 0
+    }
+
+    .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #365057
+    }
+
+    .row:last-child {
+        border: 0
+    }
+
+    button,
+    input {
+        min-height: 44px;
+        font: inherit;
+        border-radius: 9px;
+        padding: 8px
+    }
+
+    button {
+        border: 0;
+        background: #79e0bb;
+        color: #10251e;
+        font-weight: 700
+    }
+
+    .ghost {
+        background: transparent;
+        color: #edf5f2;
+        border: 1px solid #365057
+    }
+
+    .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap
+    }
+
+    .edit {
+        display: grid;
+        gap: 10px
+    }
+
+    .edit label {
+        display: grid;
+        gap: 5px
+    }
+
+    .edit input {
+        background: #102025;
+        color: white;
+        border: 1px solid #365057
+    }
+
+    @media(max-width:520px) {
+        .actions button {
+            flex: 1
+        }
+    }
+</style>
+<main id="app"></main>
+<script type="module">
+import { createCar, createId, loadLibrary, renameCar, removeCar } from './car-library.js'; import { calculatePlan } from './car-loan-calculations.js';
+    const root = document.querySelector('#app'), key = 'personal-tools.car-library.v1', fmt = n => new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(n || 0); let lib = loadLibrary(localStorage.getItem(key)), page = 'list', editing = false;
+    const active = () => lib.cars.find(c => c.id === lib.activeId), total = c => c.expenseItems.reduce((n, x) => n + Number(x.amount || 0), 0), save = () => localStorage.setItem(key, JSON.stringify(lib));
+    function result(p) { return calculatePlan({ carPrice: +p.downPayment + +p.loanAmount, downPayment: +p.downPayment, purchaseTax: 0, insurance: 0, registrationFee: 0, otherFee: 0 }, { months: +p.months, annualRate: +p.rate, fee: 0, repaymentMethod: 'annuity' }) }
+    function list() { return `<h1>我的购车方案</h1><button data-new>新增购车方案</button>${lib.cars.map(c => `<button class="car" data-open="${c.id}"><b>${c.name}</b><span class="sum">${fmt(total(c))}</span>落地价 · ${c.financePlans.length} 个金融方案</button>`).join('')}` }
+    function detail() { let c = active(), fees = editing ? `<div class="edit">${c.expenseItems.map(x => `<label>${x.label}<input data-fee="${x.id}" type="number" value="${x.amount}"></label>`).join('')}<button data-addfee>新增自定义费用</button><button data-savefee>保存基本费用</button></div>` : c.expenseItems.map(x => `<div class="row"><span>${x.label}</span><b>${fmt(x.amount)}</b></div>`).join(''); return `<div class="actions"><button class="ghost" data-back>返回列表</button><button class="ghost" data-name>修改名称</button><button class="ghost" data-delete>删除方案</button></div><h1>${c.name}</h1><section><h2>基本费用</h2><button data-editfee>${editing ? '取消编辑' : '编辑基本费用'}</button>${fees}<p class="sum">落地价 ${fmt(total(c))}</p></section><section><h2>金融方案</h2><button data-addplan>新增金融方案</button>${c.financePlans.map(p => { let r = result(p); return `<article class="finance"><div class="edit"><label>贷款方<input data-plan="${p.id}" data-field="lender" value="${p.lender}"></label><label>首付<input data-plan="${p.id}" data-field="downPayment" type="number" value="${p.downPayment}"></label><label>贷款金额<input data-plan="${p.id}" data-field="loanAmount" type="number" value="${p.loanAmount}"></label><label>年利率（%）<input data-plan="${p.id}" data-field="rate" type="number" value="${p.rate}"></label><label>分期期数<input data-plan="${p.id}" data-field="months" type="number" value="${p.months}"></label></div><div class="row"><span>每期还款</span><b>${fmt(r.monthlyPayment)}</b></div><div class="row"><span>总还款 / 总利息</span><b>${fmt(r.totalPayment)} / ${fmt(r.totalInterest)}</b></div></article>` }).join('') || '<p>还没有金融方案</p>'}</section>` }
+    function render() { root.innerHTML = page === 'list' ? list() : detail() }
+    function change(f) { f(); active().updatedAt = Date.now(); save(); render() }
+    root.onclick = e => { let d = e.target.dataset, c = active(); if (d.new) { let n = createCar(); lib.cars.push(n); lib.activeId = n.id; page = 'detail'; save() } else if (d.open) { lib.activeId = d.open; page = 'detail' } else if (d.back) page = 'list'; else if (d.editfee) editing = !editing; else if (d.savefee) editing = false; else if (d.addfee) change(() => c.expenseItems.push({ id: createId(), label: '自定义费用', amount: 0 })); else if (d.name) { let n = prompt('购车方案名称', c.name); if (n !== null) change(() => Object.assign(c, renameCar(c, n))) } else if (d.delete && confirm('确定删除此购车方案？')) { lib = removeCar(lib, c.id); page = 'list'; save() } else if (d.addplan) change(() => c.financePlans.push({ id: createId(), lender: '银行方案', downPayment: 0, loanAmount: 100000, rate: 3.6, months: 60 })); render() };
+    root.oninput = e => { let t = e.target, c = active(); if (t.dataset.fee) { c.expenseItems.find(x => x.id === t.dataset.fee).amount = +t.value; save(); render() } if (t.dataset.plan) { let p = c.financePlans.find(x => x.id === t.dataset.plan), f = t.dataset.field; p[f] = ['downPayment', 'loanAmount', 'rate', 'months'].includes(f) ? +t.value : t.value; save(); render() } }; render();
+</script>
+
+</html>

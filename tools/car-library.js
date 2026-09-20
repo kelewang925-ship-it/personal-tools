@@ -1,8 +1,9 @@
 const cleanName = (name) => String(name ?? '').trim() || '未命名购车方案';
-const defaultExpenses = () => [['裸车价', 200000], ['购置税', 0], ['保险', 0], ['上牌费', 0]].map(([label, amount]) => ({ id: crypto.randomUUID(), label, amount }));
+export const createId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const defaultExpenses = () => [['裸车价', 200000], ['购置税', 0], ['保险', 0], ['上牌费', 0]].map(([label, amount]) => ({ id: createId(), label, amount }));
 
 export function createCar(name = '未命名购车方案') {
-  return { id: crypto.randomUUID(), name: cleanName(name), expenseItems: defaultExpenses(), financePlans: [], updatedAt: Date.now() };
+  return { id: createId(), name: cleanName(name), expenseItems: defaultExpenses(), financePlans: [], updatedAt: Date.now() };
 }
 
 function freshLibrary() {
