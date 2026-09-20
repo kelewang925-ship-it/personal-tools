@@ -8,3 +8,10 @@ test('page presents a car library and saved-cost reading view', async () => {
     assert.match(html, new RegExp(text));
   }
 });
+
+test('page persists a car library and exposes finance inputs', async () => {
+  const html = await readFile(new URL('../tools/购车分期比较器.html', import.meta.url), 'utf8');
+  for (const text of ['personal-tools.car-library.v1', '贷款方', '首付', '贷款金额', '年利率', '分期期数', '每期还款', '总还款 / 总利息']) {
+    assert.match(html, new RegExp(text));
+  }
+});
