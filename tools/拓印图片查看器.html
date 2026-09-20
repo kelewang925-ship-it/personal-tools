@@ -315,6 +315,7 @@
       <button class="square" id="zoomOut" type="button" aria-label="缩小" disabled>−</button>
       <output class="zoom-value" id="zoomValue" aria-live="polite">100%</output>
       <button class="square" id="zoomIn" type="button" aria-label="放大" disabled>+</button>
+      <button class="square" id="rotateButton" type="button" aria-label="顺时针旋转 90 度" disabled>↻</button>
       <button id="resetButton" type="button" disabled>适配</button>
       <div class="move-pad" aria-label="移动图片">
         <button class="move-button" id="moveUp" type="button" aria-label="向上移动" disabled>↑</button>
@@ -340,7 +341,7 @@
       'use strict';
 
       global.createViewerState = function createViewerState() {
-        const state = { scale: 1, x: 0, y: 0, locked: false, controlsCollapsed: false };
+        const state = { scale: 1, x: 0, y: 0, rotation: 0, locked: false, controlsCollapsed: false };
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
         return {
@@ -363,11 +364,17 @@
             state.y += delta[1];
             return { x: state.x, y: state.y };
           },
+          rotate() {
+            if (state.locked) return state.rotation;
+            state.rotation = (state.rotation + 90) % 360;
+            return state.rotation;
+          },
           reset() {
             if (state.locked) return false;
             state.scale = 1;
             state.x = 0;
             state.y = 0;
+            state.rotation = 0;
             return true;
           },
           setLocked(nextLocked) {
@@ -380,7 +387,7 @@
             return state.controlsCollapsed;
           },
           snapshot() {
-            return { scale: state.scale, x: state.x, y: state.y, locked: state.locked, controlsCollapsed: state.controlsCollapsed };
+            return { scale: state.scale, x: state.x, y: state.y, rotation: state.rotation, locked: state.locked, controlsCollapsed: state.controlsCollapsed };
           }
         };
       };
@@ -399,6 +406,7 @@
       const zoomOut = byId('zoomOut');
       const zoomIn = byId('zoomIn');
       const zoomValue = byId('zoomValue');
+      const rotateButton = byId('rotateButton');
       const resetButton = byId('resetButton');
       const moveButtons = {
         up: byId('moveUp'),
@@ -450,7 +458,7 @@
 
       function renderImage() {
         const state = viewer.snapshot();
-        imageWrap.style.transform = `translate(-50%, -50%) translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+        imageWrap.style.transform = `translate(-50%, -50%) translate(${state.x}px, ${state.y}px) scale(${state.scale}) rotate(${state.rotation}deg)`;
         zoomValue.value = `${Math.round(state.scale * 100)}%`;
         zoomValue.textContent = zoomValue.value;
       }
@@ -467,6 +475,7 @@
         emptyPickButton.disabled = state.locked;
         zoomOut.disabled = state.locked || !hasImage;
         zoomIn.disabled = state.locked || !hasImage;
+        rotateButton.disabled = state.locked || !hasImage;
         resetButton.disabled = state.locked || !hasImage;
         Object.values(moveButtons).forEach((button) => { button.disabled = state.locked || !hasImage; });
         collapseButton.disabled = state.locked;
@@ -476,7 +485,10 @@
       }
 
       function calculateFitScale() {
-        return Math.min(1, window.innerWidth / Math.max(1, viewerImage.naturalWidth), window.innerHeight / Math.max(1, viewerImage.naturalHeight));
+        const rotated = viewer.snapshot().rotation % 180 !== 0;
+        const imageWidth = rotated ? viewerImage.naturalHeight : viewerImage.naturalWidth;
+        const imageHeight = rotated ? viewerImage.naturalWidth : viewerImage.naturalHeight;
+        return Math.min(1, window.innerWidth / Math.max(1, imageWidth), window.innerHeight / Math.max(1, imageHeight));
       }
 
       function resetToFit() {
@@ -500,6 +512,12 @@
 
       const zoomBy = (factor, x, y) => zoomTo(viewer.snapshot().scale * factor, x, y);
       const openPicker = () => { if (!isLocked()) fileInput.click(); };
+      const rotateImage = () => {
+        if (isLocked() || !hasImage) return;
+        viewer.rotate();
+        renderImage();
+        setStatus(`图片已旋转 ${viewer.snapshot().rotation}°`);
+      };
       const nudge = (direction) => {
         if (isLocked() || !hasImage) return;
         viewer.nudge(direction);
@@ -545,6 +563,7 @@
       emptyPickButton.addEventListener('click', openPicker);
       zoomIn.addEventListener('click', () => zoomBy(1.2));
       zoomOut.addEventListener('click', () => zoomBy(1 / 1.2));
+      rotateButton.addEventListener('click', rotateImage);
       resetButton.addEventListener('click', resetToFit);
       Object.entries(moveButtons).forEach(([direction, button]) => {
         button.addEventListener('pointerdown', (event) => {
