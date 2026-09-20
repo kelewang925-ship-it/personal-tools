@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d171b">
+  <meta name="description" content="在本地比较多个银行的购车分期方案，查看月供、总利息和还款计划。">
+  <title>购车分期比较器</title>
+  <style>
+    :root { --ink:#e8f1ef; --muted:#98aaa7; --page:#0d171b; --panel:#142126; --panel2:#192b31; --line:#2b4045; --mint:#72e2b9; --yellow:#f8cf78; --danger:#ff9c9c; }
+    * { box-sizing:border-box; } body { margin:0; background:radial-gradient(circle at 90% -5%,#245354 0,transparent 31%),var(--page); color:var(--ink); font-family:Inter,"Microsoft YaHei UI",system-ui,sans-serif; font-size:16px; }
+    button,input,select { font:inherit; } button { cursor:pointer; } .app-shell { width:min(1220px,100%); margin:auto; padding:30px 20px 60px; } header { display:flex; justify-content:space-between; align-items:end; gap:24px; padding:10px 0 28px; border-bottom:1px solid var(--line); } .eyebrow { margin:0 0 9px; color:var(--mint); font-size:12px; font-weight:800; letter-spacing:.12em; } h1 { margin:0; font-size:clamp(34px,5vw,56px); letter-spacing:-.055em; line-height:1; } h2 { margin:0; font-size:19px; letter-spacing:-.02em; } .subtitle { max-width:28ch; margin:0; color:var(--muted); line-height:1.6; }
+    .layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(340px,.9fr); gap:18px; margin-top:22px; } .stack { display:grid; gap:18px; } section { border:1px solid var(--line); border-radius:20px; background:linear-gradient(145deg,var(--panel2),var(--panel)); padding:20px; box-shadow:inset 0 1px 0 rgb(255 255 255 /.04); } .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; } .section-note { color:var(--muted); font-size:13px; }
+    .form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; } .field { display:grid; gap:7px; color:var(--muted); font-size:14px; } .field.wide { grid-column:1/-1; } input,select { min-width:0; width:100%; border:1px solid #385158; border-radius:10px; padding:10px 11px; background:#0e1a1e; color:var(--ink); outline:none; } input:focus,select:focus { border-color:var(--mint); box-shadow:0 0 0 3px rgb(114 226 185 /.15); } .error { color:var(--danger); font-size:14px; line-height:1.5; }
+    .primary,.ghost { border-radius:10px; padding:9px 12px; font-weight:750; } .primary { border:0; background:var(--mint); color:#10231f; } .ghost { border:1px solid #3a555a; color:var(--ink); background:transparent; } .small { padding:6px 8px; font-size:13px; } .plan-card { border:1px solid #344b51; border-radius:14px; padding:14px; margin-top:12px; background:#102025; } .plan-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; } .plan-title strong { font-size:15px; } .plan-actions { display:flex; gap:7px; }
+    .metric-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .metric { padding:13px; border-radius:13px; border:1px solid #344b51; background:#0e1a1e; } .metric span { display:block; color:var(--muted); font-size:13px; } .metric strong { display:block; margin-top:7px; font-size:20px; letter-spacing:-.035em; } .tip { margin:16px 0 0; color:var(--muted); font-size:13px; line-height:1.6; }
+    .compare { margin-top:18px; } .table-wrap { overflow-x:auto; border:1px solid #30464b; border-radius:12px; } table { width:100%; border-collapse:collapse; min-width:650px; font-size:14px; } th,td { padding:11px 12px; border-bottom:1px solid #294147; text-align:right; white-space:nowrap; } th:first-child,td:first-child { text-align:left; } th { color:var(--muted); font-weight:650; background:#102126; } tr:last-child td { border-bottom:0; } .badge { display:inline-block; margin-left:6px; padding:2px 6px; border-radius:99px; background:#264f43; color:var(--mint); font-size:11px; font-weight:800; } details { margin-top:10px; border:1px solid #314a50; border-radius:12px; background:#102025; } summary { cursor:pointer; padding:12px; font-weight:700; } details .table-wrap { margin:0 12px 12px; } .empty { padding:22px 0 5px; color:var(--muted); text-align:center; }
+    @media (max-width:800px) { .layout { grid-template-columns:1fr; } } @media (max-width:520px) { .app-shell { padding:20px 14px 42px; } header { display:block; } .subtitle { margin-top:14px; } section { padding:16px; border-radius:16px; } .form-grid,.metric-grid { grid-template-columns:1fr; } .section-head { align-items:flex-start; flex-direction:column; } .section-head > button { width:100%; } }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <header><div><p class="eyebrow">PERSONAL TOOLS / 02</p><h1>购车分期比较器</h1></div><p class="subtitle">把多个银行方案放在一起，优先看清月供压力和最终总成本。</p></header>
+    <div class="layout">
+      <div class="stack">
+        <section aria-labelledby="vehicle-title"><div class="section-head"><h2 id="vehicle-title">车辆与一次性费用</h2><span class="section-note">不自动计入贷款本金</span></div><div id="vehicle-fields" class="form-grid"></div></section>
+        <section aria-labelledby="plans-title"><div class="section-head"><h2 id="plans-title">银行方案</h2><button class="primary" id="add-plan" type="button">+ 添加方案</button></div><div id="plan-list"></div></section>
+      </div>
+      <div class="stack">
+        <section aria-labelledby="summary-title"><div class="section-head"><h2 id="summary-title">当前方案概览</h2></div><div id="summary" class="metric-grid"></div><p class="tip">手续费计入总成本并单独展示。结果按输入即时更新，数据只保存在本机浏览器。</p></section>
+        <section aria-labelledby="compare-title"><div class="section-head"><h2 id="compare-title">方案对比</h2><button class="ghost" id="export-csv" type="button">导出 CSV</button></div><div id="validation-message" class="error" role="alert"></div><div id="comparison"></div></section>
+      </div>
+    </div>
+    <section class="compare" aria-labelledby="schedule-title"><div class="section-head"><h2 id="schedule-title">还款计划</h2><span class="section-note">点击方案查看每月本金和利息</span></div><div id="schedule-list"></div></section>
+  </main>
+  <script type="module">
+    import { calculatePlan, validatePlan, validateVehicle } from './car-loan-calculations.js';
+    import { makeCsv } from './car-loan-export.js';
+    const money = new Intl.NumberFormat('zh-CN', { style:'currency', currency:'CNY', minimumFractionDigits:2 });
+    const storageKey = 'personal-tools.car-loan-comparison.v1';
+    const vehicleFields = [['carPrice','裸车价',200000],['downPayment','首付金额',60000],['purchaseTax','购置税',15000],['insurance','保险',6500],['registrationFee','上牌费',500],['otherFee','其他费用',0]];
+    let state = loadState() ?? { vehicle: Object.fromEntries(vehicleFields.map(([key,,value]) => [key,value])), plans:[defaultPlan()], expandedPlanId:null };
+    function defaultPlan() { return { id:crypto.randomUUID(), bankName:'银行方案', months:60, annualRate:3.6, fee:0, repaymentMethod:'annuity' }; }
+    function loadState() { try { return JSON.parse(localStorage.getItem(storageKey)); } catch { return null; } }
+    function saveState() { localStorage.setItem(storageKey, JSON.stringify(state)); }
+    function update(mutator) { mutator(); saveState(); render(); }
+    function label(text, control) { return `<label class="field">${text}${control}</label>`; }
+    function input(key, value) { return `<input data-vehicle="${key}" type="number" min="0" step="0.01" value="${value}">`; }
+    function planInput(id,key,value,type='number') { return `<input data-plan="${id}" data-key="${key}" type="${type}" ${type==='number'?'min="0" step="0.01"':''} value="${escapeHtml(value)}">`; }
+    function escapeHtml(value) { return String(value).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+    function results() { const errors = validateVehicle(state.vehicle); const valid = state.plans.map(plan => ({ plan, errors:validatePlan(plan) })).filter(x => { errors.push(...x.errors.map(error => `${x.plan.bankName}：${error}`)); return x.errors.length === 0; }).map(({plan}) => ({ plan, result:calculatePlan(state.vehicle,plan) })); return { errors, valid }; }
+    function render() {
+      document.querySelector('#vehicle-fields').innerHTML = vehicleFields.map(([key,name]) => label(name, input(key,state.vehicle[key]))).join('');
+      document.querySelector('#plan-list').innerHTML = state.plans.map((plan,index) => `<article class="plan-card"><div class="plan-title"><strong>方案 ${index+1}</strong><div class="plan-actions"><button class="ghost small" data-copy="${plan.id}" type="button">复制</button><button class="ghost small" data-remove="${plan.id}" type="button">删除</button></div></div><div class="form-grid">${label('银行名称',planInput(plan.id,'bankName',plan.bankName,'text'))}${label('贷款期限（月）',planInput(plan.id,'months',plan.months))}${label('年利率（%）',planInput(plan.id,'annualRate',plan.annualRate))}${label('手续费',planInput(plan.id,'fee',plan.fee))}${label('还款方式',`<select data-plan="${plan.id}" data-key="repaymentMethod"><option value="annuity" ${plan.repaymentMethod==='annuity'?'selected':''}>等额本息</option><option value="equalPrincipal" ${plan.repaymentMethod==='equalPrincipal'?'selected':''}>等额本金</option></select>`)}</div></article>`).join('');
+      const { errors, valid } = results();
+      document.querySelector('#validation-message').textContent = errors.join('；');
+      renderSummary(valid); renderComparison(valid); renderSchedules(valid);
+    }
+    function renderSummary(valid) { const first = valid[0]?.result; document.querySelector('#summary').innerHTML = first ? [['贷款本金',first.principal],['首月月供',first.monthlyPayment],['总利息',first.totalInterest],['购车总支出',first.totalCost]].map(([name,value])=>`<div class="metric"><span>${name}</span><strong>${money.format(value)}</strong></div>`).join('') : '<p class="empty">填写有效方案后显示结果</p>'; }
+    function renderComparison(valid) { if (!valid.length) { document.querySelector('#comparison').innerHTML='<p class="empty">暂无可计算的方案</p>'; return; } const lowestPayment=Math.min(...valid.map(x=>x.result.monthlyPayment)); const lowestCost=Math.min(...valid.map(x=>x.result.totalCost)); const rows=[...valid].sort((a,b)=>a.result.totalCost-b.result.totalCost).map(({plan,result})=>`<tr><td>${escapeHtml(plan.bankName)}</td><td>${money.format(result.monthlyPayment)}${result.monthlyPayment===lowestPayment?'<span class="badge">月供最低</span>':''}</td><td>${money.format(result.totalInterest)}</td><td>${money.format(plan.fee)}</td><td>${money.format(result.totalCost)}${result.totalCost===lowestCost?'<span class="badge">总成本最低</span>':''}</td></tr>`).join(''); document.querySelector('#comparison').innerHTML=`<div class="table-wrap"><table><thead><tr><th>银行</th><th>月供</th><th>总利息</th><th>手续费</th><th>购车总支出</th></tr></thead><tbody>${rows}</tbody></table></div>`; }
+    function renderSchedules(valid) { document.querySelector('#schedule-list').innerHTML = valid.length ? valid.map(({plan,result})=>`<details ${state.expandedPlanId===plan.id?'open':''}><summary data-summary="${plan.id}">${escapeHtml(plan.bankName)} · ${plan.repaymentMethod==='annuity'?'等额本息':'等额本金'} · ${plan.months} 期</summary><div class="table-wrap"><table><thead><tr><th>期数</th><th>月供</th><th>本金</th><th>利息</th><th>剩余本金</th></tr></thead><tbody>${result.schedule.map(item=>`<tr><td>${item.month}</td><td>${money.format(item.payment)}</td><td>${money.format(item.principal)}</td><td>${money.format(item.interest)}</td><td>${money.format(item.balance)}</td></tr>`).join('')}</tbody></table></div></details>`).join('') : '<p class="empty">暂无还款计划</p>'; }
+    document.addEventListener('input',event=>{ const { target }=event; if(target.dataset.vehicle) update(()=>{state.vehicle[target.dataset.vehicle]=Number(target.value)}); if(target.dataset.plan) update(()=>{const plan=state.plans.find(p=>p.id===target.dataset.plan); plan[target.dataset.key]=target.type==='number'?Number(target.value):target.value;}); });
+    document.addEventListener('change',event=>{ const { target }=event; if(target.dataset.plan) update(()=>{state.plans.find(p=>p.id===target.dataset.plan)[target.dataset.key]=target.value;}); });
+    document.addEventListener('click',event=>{ const id=event.target.dataset.copy; const remove=event.target.dataset.remove; if(id) update(()=>{const original=state.plans.find(p=>p.id===id); state.plans.push({...original,id:crypto.randomUUID(),bankName:`${original.bankName}（副本）`});}); if(remove) update(()=>{if(state.plans.length>1) state.plans=state.plans.filter(p=>p.id!==remove);}); });
+    document.querySelector('#add-plan').addEventListener('click',()=>update(()=>state.plans.push(defaultPlan())));
+    document.querySelector('#export-csv').addEventListener('click',()=>{const {valid}=results(); if(!valid.length) return; const link=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([makeCsv(state,valid)],{type:'text/csv;charset=utf-8'})),download:'购车分期方案比较.csv'}); link.click(); URL.revokeObjectURL(link.href);});
+    render();
+  </script>
+</body>
+</html>
