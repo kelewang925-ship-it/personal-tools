@@ -111,6 +111,8 @@
       will-change: transform;
     }
 
+    .image-wrap.is-rotating { transition: transform 1s ease; }
+
     .viewer-image {
       display: block;
       max-width: none;
@@ -297,6 +299,10 @@
       .move-pad { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px); padding: 5px; }
       .move-button { min-width: 40px; min-height: 38px; border-radius: 11px; font-size: 18px; }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      .image-wrap.is-rotating { transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -431,6 +437,7 @@
       const nudgeHoldDelay = 320;
       const nudgeRepeatDelay = 90;
       const nudgePresses = new Map();
+      let rotationTimer = 0;
       let dragOrigin = null;
       let pinchOrigin = null;
 
@@ -514,8 +521,11 @@
       const openPicker = () => { if (!isLocked()) fileInput.click(); };
       const rotateImage = () => {
         if (isLocked() || !hasImage) return;
+        imageWrap.classList.add('is-rotating');
         viewer.rotate();
         renderImage();
+        clearTimeout(rotationTimer);
+        rotationTimer = setTimeout(() => imageWrap.classList.remove('is-rotating'), 1000);
         setStatus(`图片已旋转 ${viewer.snapshot().rotation}°`);
       };
       const nudge = (direction) => {
