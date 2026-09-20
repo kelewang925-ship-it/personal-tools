@@ -15,3 +15,19 @@ test('page persists a car library and exposes finance inputs', async () => {
     assert.match(html, new RegExp(text));
   }
 });
+
+test('page delegates card actions from nested card content', async () => {
+  const html = await readFile(new URL('../tools/购车分期比较器.html', import.meta.url), 'utf8');
+  assert.match(html, /closest\('\[data-open\]|closest\("\[data-open\]/);
+});
+
+test('new car action asks for a recognizable plan name', async () => {
+  const html = await readFile(new URL('../tools/购车分期比较器.html', import.meta.url), 'utf8');
+  assert.match(html, /prompt\('购车方案名称'/);
+  assert.match(html, /createCar\(name\)/);
+});
+
+test('empty data action attributes are checked by presence, not truthiness', async () => {
+  const html = await readFile(new URL('../tools/购车分期比较器.html', import.meta.url), 'utf8');
+  assert.match(html, /hasAttribute\(`data-\$\{key\}`\)/);
+});
